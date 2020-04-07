@@ -1,10 +1,11 @@
+from distribution import UniformDistribution
 from functools import reduce, partial
-from random import random, randrange
+from random import randrange
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 
-# Constants
+# defaults
 k_default_size = 1000
 k_default_in_shape = (10,)
 k_default_min_length = 20
@@ -12,26 +13,11 @@ k_default_max_length = 20
 k_default_include_stop = True
 
 
-# Distributions
-class Distribtuion:
-	def sample(self):
-		raise NotImplementedError
-
-	def __call__(self):
-		return self.sample()
-
-
-class UniformDistribution(Distribtuion):
-	def sample(self):
-		return random()
-
-
-# Tasks
 class AlgorithmicTask(Dataset):
 	# f: callable that maps input tensor sequences 
-	#          to output tensor sequences
-	#
-	# distribution: 
+	#    to output tensor sequences
+	# 
+	# TODO: Describe all parameters.
 	def __init__(self, f=lambda x: x, distribution=UniformDistribution, 
 				 size=k_default_size, in_shape=k_default_in_shape, 
 				 min_length=k_default_min_length, max_length=k_default_max_length,
@@ -60,13 +46,17 @@ class AlgorithmicTask(Dataset):
 		x = torch.Tensor(data).view(length, *self._in_shape)
 		y = self._f(x)
 
+		# TODO: Add stop token to input.
+		if self._include_stop:
+			pass
+
 		self._items[idx] = (x, y)
 		return (x, y)
 
 
 class Identity(AlgorithmicTask):
 	def __init__(self, *args, **kwargs):
-		super().__init__(lambda x: x, **args)
+		super().__init__(lambda x: x, *args, **kwargs)
 
 
 class Copy(AlgorithmicTask):
@@ -75,13 +65,4 @@ class Copy(AlgorithmicTask):
 		super().__init__(f=self._copy, *args, **kwargs)
 
 	def _copy(self, x):
-		return torch.cat([x, x], dim=0)
-
-
-
-dataset = Copy(num_copies=2, size=20, min_length=5, max_length=5)
-loader = DataLoader(dataset, batch_size=1, shuffle=True)
-
-for x, y in loader:
-	print(x)
-	print(y)
+		return torch.cat([x for _ in range(self._num_copies)], dim=0)

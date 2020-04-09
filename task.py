@@ -45,7 +45,7 @@ class AlgorithmicTask(Dataset):
 			return self._items[idx]
 
 		length = randrange(self._min_length, self._max_length + 1)
-		size = reduce(lambda x, y: x * y, [length, self._in_width])
+		size = length * self._in_width
 		data = [self._distribution() for _ in range(size)]
 		x = torch.Tensor(data).view(length, self._in_width)
 		y = self._f(x)

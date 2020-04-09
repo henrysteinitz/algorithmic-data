@@ -7,10 +7,11 @@ from torch.utils.data import Dataset
 
 # defaults
 k_default_size = 1000
-k_default_in_shape = (10,)
+k_default_in_width = 10
 k_default_min_length = 20
 k_default_max_length = 20
 k_default_include_stop = True
+k_default_pad_output_until_stop = False
 
 
 class AlgorithmicTask(Dataset):
@@ -19,16 +20,19 @@ class AlgorithmicTask(Dataset):
 	# 
 	# TODO: Describe all parameters.
 	def __init__(self, f=lambda x: x, distribution=UniformDistribution, 
-				 size=k_default_size, in_shape=k_default_in_shape, 
+				 size=k_default_size, in_width=k_default_in_width, 
 				 min_length=k_default_min_length, max_length=k_default_max_length,
-				 include_stop=k_default_include_stop):
+				 include_stop=k_default_include_stop, 
+				 pad_output_until_stop=k_default_pad_output_until_stop):
 		self._f = f
 		self._distribution = distribution()
 		self._size = size
-		self._in_shape = in_shape
+		# TODO: Support custom 'in_shape's.
+		self._in_width = in_width
 		self._min_length = min_length
 		self._max_length = max_length
 		self._include_stop = include_stop
+		self._pad_output_until_stop = pad_output_until_stop
 		self._items = {}
 
 
@@ -41,13 +45,21 @@ class AlgorithmicTask(Dataset):
 			return self._items[idx]
 
 		length = randrange(self._min_length, self._max_length + 1)
-		size = reduce(lambda x, y: x * y, [length, *self._in_shape])
+		size = reduce(lambda x, y: x * y, [length, self._in_width])
 		data = [self._distribution() for _ in range(size)]
-		x = torch.Tensor(data).view(length, *self._in_shape)
+		x = torch.Tensor(data).view(length, self._in_width)
 		y = self._f(x)
 
-		# TODO: Add stop token to input.
+		# Add stop token to input.
 		if self._include_stop:
+			length_stop_pad = torch.zeros([length, 1])
+			x = torch.cat([x, length_stop_pad], dim=1)
+			width_stop_pad = torch.zeros([1, self._in_width + 1])
+			width_stop_pad[0, -1] = 1
+			x = torch.cat([x, width_stop_pad], dim=0)
+
+		# TODO: Pad output.
+		if self._pad_output_until_stop:
 			pass
 
 		self._items[idx] = (x, y)
@@ -66,3 +78,14 @@ class Copy(AlgorithmicTask):
 
 	def _copy(self, x):
 		return torch.cat([x for _ in range(self._num_copies)], dim=0)
+
+
+class Reverse(AlgorithmicTask):
+	def __init__(self, *args, **kwargs):
+		super().__init__(f=self._reverse, *args, **kwargs)
+
+	def _reverse(self, x):
+		return torch.flip(x, dims=[0])
+
+
+# TODO: Add more tasks. E.g. sum and sort.

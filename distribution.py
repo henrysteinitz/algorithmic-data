@@ -12,3 +12,4 @@ class Distribtuion:
 class UniformDistribution(Distribtuion):
 	def sample(self):
 		return random()
+
